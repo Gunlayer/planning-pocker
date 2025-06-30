@@ -7,13 +7,13 @@ interface RoomState {
   roomId: string | null;
   participants: Participant[];
   cards: string[];
-  timer: number;
+  endTime: number | null;
   setSelf: (name: string) => void;
   setRoomId: (id: string) => void;
   setParticipants: (p: Participant[]) => void;
   vote: (card: string) => void;
   reset: () => void;
-  tick: () => void;
+  setEndTime: (endTime: number) => void;
 }
 
 export const useRoomStore = create<RoomState>((set, get) => ({
@@ -21,7 +21,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   roomId: null,
   participants: [],
   cards: ['1', '2', '3', '5', '8', '13', '?'] as const,
-  timer: 60,
+  endTime: null,
   setSelf: (name) => {
     const newSelf = { id: uuid(), name, card: undefined };
     set({ self: newSelf });
@@ -40,8 +40,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         card: undefined,
       })),
       self: { ...state.self, card: undefined } as Participant,
-      timer: 60,
     }));
   },
-  tick: () => set((state) => ({ timer: state.timer - 1 })),
+  setEndTime: (endTime: number) => set({ endTime }),
 }));

@@ -26,6 +26,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const roomId = useRoomStore((s) => s.roomId);
   const setParticipants = useRoomStore((s) => s.setParticipants);
   const self = useRoomStore((s) => s.self);
+  const setEndTime = useRoomStore((s) => s.setEndTime);
 
   const [ready, setReady] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -46,6 +47,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (type === 'state') {
         setParticipants(payload.participants);
       }
+      if (type === 'countdown') {
+        console.log('🟢 Countdown received:', payload);
+        setEndTime(payload.endTime);
+      }
     };
     ws.onclose = (e) => {
       console.log('🔴 WebSocket is closed', e.code, e.reason);
@@ -57,7 +62,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     return () => ws.close(1000, 'Component unmounted');
-  }, [roomId, setParticipants, self]);
+  }, [roomId, setParticipants, self, setEndTime]);
 
   const value = useMemo<WSContextValue>(
     () => ({

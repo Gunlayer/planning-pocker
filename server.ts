@@ -9,6 +9,9 @@ interface ClientInfo {
 
 const rooms: Record<string, ClientInfo[]> = {};
 
+const voteTimers: Record<string, NodeJS.Timeout> = {};
+const voteStarted: Record<string, boolean> = {};
+
 const lobbyClients = new Set<WebSocket>();
 
 const broadcast = (roomId: string) => {
@@ -65,7 +68,7 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => {
       lobbyClients.delete(ws);
-      console.log('🔴 Lobby клиент отключился');
+      console.log('🔴 Client has left Lobby');
     });
 
     ws.on('error', (err) => {
@@ -105,22 +108,74 @@ wss.on('connection', (ws, req) => {
         broadcastLobbyRooms();
         break;
       }
-      case 'vote':
-        if (client) client.card = card;
-        broadcast(roomId);
+      case 'vote': {
+        if (client) {
+          client.card = card;
+        }
+
+        if (!voteStarted[roomId] && rooms[roomId].length > 1) {
+          console.log(`Vote started in room: ${roomId} by user ${client?.id}`);
+
+          voteStarted[roomId] = true;
+          const endTime = Date.now() + 10000;
+
+          const countdownMsg = JSON.stringify({
+            type: 'countdown',
+            payload: { endTime },
+          });
+
+          rooms[roomId].forEach((c) => c.ws.send(countdownMsg));
+
+          broadcast(roomId);
+
+          voteTimers[roomId] = setTimeout(() => {
+            rooms[roomId]?.forEach((c) => {
+              if (!c.card) c.card = '?';
+            });
+            broadcast(roomId);
+            console.log('Coundown finished for room:', roomId);
+
+            rooms[roomId].forEach((c) => {
+              c.ws.send(JSON.stringify({ type: 'countdown', payload: { endTime: 0 } }));
+            });
+            delete voteTimers[roomId];
+            voteStarted[roomId] = false;
+          }, 10000);
+        } else {
+          const everyoneVoted = rooms[roomId].every((c) => typeof c.card === 'string');
+          console.log('Everyone voted:', everyoneVoted);
+          broadcast(roomId);
+
+          if (everyoneVoted) {
+            clearTimeout(voteTimers[roomId]);
+            rooms[roomId].forEach((c) => {
+              c.ws.send(JSON.stringify({ type: 'countdown', payload: { endTime: 0 } }));
+            });
+            delete voteTimers[roomId];
+            voteStarted[roomId] = false;
+            broadcast(roomId);
+          }
+        }
+
         break;
+      }
       case 'reset':
-        rooms[roomId].forEach((c) => delete c.card);
+        rooms[roomId].forEach((c) => {
+          c.ws.send(JSON.stringify({ type: 'countdown', payload: { endTime: null } }));
+          c.card = undefined;
+          delete c.card;
+        });
         broadcast(roomId);
         break;
       case 'quit':
         if (client) {
           rooms[roomId] = rooms[roomId].filter((c) => c.id !== client?.id);
+          if (rooms[roomId].length === 0) {
+            delete rooms[roomId];
+            console.log(`🗑️ Room ${roomId} is empty and has been deleted`);
+          }
         }
-        if (rooms[roomId].length === 0) {
-          delete rooms[roomId];
-          console.log(`🗑️ Room ${roomId} is empty and has been deleted`);
-        }
+
         broadcastLobbyRooms();
         broadcast(roomId);
         break;

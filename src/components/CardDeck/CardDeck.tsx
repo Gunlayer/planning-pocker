@@ -21,7 +21,7 @@ const CardDeck: FC<CardDeckProps> = ({ onVote, disabled }) => {
           key={card}
           value={card}
           disabled={disabled}
-          selected={self?.card === card && participantCard === card}
+          selected={participantCard === card}
           onSelect={() => {
             onVote(card);
           }}
